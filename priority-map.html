@@ -1,0 +1,2237 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PriorityMap</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%23161b2e'/><circle cx='20' cy='20' r='8' fill='%230077BB' opacity='0.9'/><circle cx='40' cy='16' r='11' fill='%23009988' opacity='0.9'/><circle cx='28' cy='40' r='6' fill='%23EE7733' opacity='0.9'/><line x1='1' y1='32' x2='63' y2='32' stroke='white' stroke-opacity='0.15' stroke-width='1'/><line x1='21' y1='1' x2='21' y2='63' stroke='white' stroke-opacity='0.15' stroke-width='1'/><line x1='42' y1='1' x2='42' y2='63' stroke='white' stroke-opacity='0.15' stroke-width='1'/></svg>">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" integrity="sha384-vsrfeLOOY6KuIYKDlmVH5UiBmgIdB1oEf7p01YgWHuqmOHfZr374+odEv96n9tNC" crossorigin="anonymous"></script>
+<style>
+/* ==========================================================================
+   DESIGN TOKENS
+   Centralised values for theming, spacing, typography, and radii.
+   ========================================================================== */
+:root {
+  /* Colors — light theme */
+  --bg: #f5f5f8;
+  --surface: #ffffff;
+  --surface2: #f0f0f4;
+  --text: #1a1a2e;
+  --text2: #555555;
+  --text3: #999999;
+  --border: #e0e0e8;
+  --border2: #d0d0d8;
+  --accent: #4a90e2;
+  --hover: #f8f8fc;
+  --danger: #e74c3c;
+  --icon-bg: #161b2e;
+
+  /* Spacing scale (4px base) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+
+  /* Typography scale */
+  --text-xs: 0.65rem;
+  --text-sm: 0.72rem;
+  --text-base: 0.8rem;
+  --text-md: 0.85rem;
+  --text-lg: 1rem;
+  --text-xl: 1.1rem;
+
+  /* Border radii */
+  --radius-sm: 3px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+  --radius-xl: 10px;
+
+  /* Z-index layers */
+  --z-sticky: 100;
+  --z-backdrop: 899;
+  --z-modal: 900;
+  --z-fullscreen: 1000;
+  --z-fullscreen-controls: 1002;
+
+  /* Transitions */
+  --transition-fast: 0.15s ease;
+  --transition-base: 0.2s ease;
+}
+
+[data-theme="dark"] {
+  --bg: #121218;
+  --surface: #1c1c24;
+  --surface2: #242430;
+  --text: #e8e8ec;
+  --text2: #b0b0b8;
+  --text3: #6e6e7a;
+  --border: #2e2e3a;
+  --border2: #3a3a48;
+  --accent: #5a9ef0;
+  --hover: #26262f;
+  --icon-bg: #e8e8ec;
+}
+
+/* ==========================================================================
+   RESET & BASE
+   ========================================================================== */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  transition: background var(--transition-base), color var(--transition-base);
+}
+
+/* ==========================================================================
+   UTILITIES
+   ========================================================================== */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.sr-only-focusable:focus {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 9999;
+  width: auto;
+  height: auto;
+  padding: var(--space-2);
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+  background: var(--accent);
+  color: #fff;
+  text-decoration: none;
+  font-size: var(--text-base);
+}
+
+#fileInput { display: none; }
+
+/* ==========================================================================
+   LAYOUT
+   ========================================================================== */
+.content {
+  padding: var(--space-6);
+}
+
+.main-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+  justify-content: center;
+}
+
+/* ==========================================================================
+   APP BAR
+   ========================================================================== */
+.app-bar {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  background: color-mix(in srgb, var(--surface) 85%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+  padding: var(--space-3) var(--space-5);
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.app-bar-title {
+  display: flex;
+  flex-direction: column;
+  margin-right: auto;
+}
+
+.app-bar-title h1 {
+  font-size: var(--text-xl);
+  letter-spacing: -0.3px;
+  line-height: 1.2;
+}
+
+.app-bar-title .subtitle {
+  font-size: var(--text-xs);
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+/* ==========================================================================
+   TOOLBAR & BUTTONS
+   ========================================================================== */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.toolbar button,
+.toolbar label {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text2);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  font-size: 0.74rem;
+  transition: all var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  white-space: nowrap;
+}
+
+.toolbar button:hover,
+.toolbar label:hover {
+  border-color: var(--border2);
+  background: var(--hover);
+  color: var(--text);
+}
+
+.toolbar button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.toolbar button:focus-visible,
+.toolbar label:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.toolbar svg {
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+.toolbar-help-btn {
+  border-radius: var(--radius-md) !important;
+  font-weight: 600;
+  font-size: 0.9rem;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  justify-content: center;
+}
+
+/* --- Button Group (joined buttons) --- */
+.btn-group {
+  display: flex;
+  gap: 0;
+}
+
+.btn-group > button,
+.btn-group > label {
+  border-radius: 0;
+  border-right-width: 0;
+}
+
+.btn-group > :first-child {
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+}
+
+.btn-group > :last-child {
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  border-right-width: 1px;
+}
+
+/* --- Icon Button (square, no text) --- */
+.icon-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text3);
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 0.7rem;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.icon-btn--danger:hover {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+
+.icon-btn--accent:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* ==========================================================================
+   CHART
+   ========================================================================== */
+.chart-wrapper {
+  flex: 0 0 auto;
+  width: min(700px, 100%);
+}
+
+.chart-box {
+  position: relative;
+  width: 100%;
+  padding-bottom: 100%; /* 1:1 aspect ratio */
+  background: var(--surface);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border);
+  overflow: visible;
+}
+
+.chart-box canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* ==========================================================================
+   LEGEND
+   ========================================================================== */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  justify-content: center;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-md);
+  border: none;
+  background: none;
+  color: var(--text);
+  transition: opacity var(--transition-fast);
+}
+
+.legend-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.legend-item.disabled {
+  opacity: 0.3;
+  text-decoration: line-through;
+}
+
+.legend-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--text3);
+}
+
+/* ==========================================================================
+   DATA TABLE
+   ========================================================================== */
+.grid-section {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.grid-section h2 {
+  font-size: var(--text-md);
+  color: var(--text3);
+  margin-bottom: var(--space-3);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.grid-scroll {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--text-base);
+}
+
+/* --- Table Header --- */
+thead th {
+  background: var(--surface2);
+  padding: var(--space-3);
+  text-align: left;
+  font-weight: 500;
+  color: var(--text3);
+  text-transform: uppercase;
+  font-size: 0.68rem;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+thead th:hover { color: var(--text); }
+thead th:last-child { cursor: default; }
+thead th:last-child:hover { color: var(--text3); }
+
+thead th:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* Sort indicators */
+thead th.sorted::after { content: ' ▲'; font-size: 0.6rem; }
+thead th.sorted.desc::after { content: ' ▼'; }
+
+/* --- Table Body --- */
+tbody tr {
+  background: var(--surface);
+  transition: background 0.1s;
+}
+
+tbody tr:hover { background: var(--hover); }
+tbody tr.highlighted { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+td.init-col { min-width: 280px; }
+
+/* --- Inline Table Inputs --- */
+td input[type="text"],
+td select {
+  width: 100%;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-md);
+  font-size: var(--text-base);
+}
+
+td input[type="text"]:hover,
+td select:hover {
+  border-color: var(--border2);
+}
+
+td input[type="text"]:focus,
+td select:focus {
+  border-color: var(--accent);
+  outline: none;
+  background: var(--surface2);
+}
+
+td select {
+  background: var(--surface);
+  cursor: pointer;
+}
+
+/* --- Slider Cell --- */
+.slider-cell {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.slider-cell input[type="range"] {
+  flex: 1;
+  accent-color: var(--accent);
+  height: 4px;
+  cursor: pointer;
+}
+
+.slider-cell .slider-val {
+  font-size: var(--text-sm);
+  color: var(--text3);
+  min-width: 18px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Actions Cell --- */
+.actions-cell {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.del-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text3);
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 0.7rem;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.del-btn:hover {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+
+.del-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.dup-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text3);
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 0.7rem;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dup-btn:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.dup-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* --- Notes Row --- */
+.notes-row { display: none; }
+.notes-row.open { display: table-row; }
+
+.notes-row td {
+  padding: 2px var(--space-3) var(--space-2) 40px;
+  border-bottom: 1px solid var(--border);
+}
+
+.notes-row textarea {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-md);
+  font-size: 0.75rem;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 28px;
+}
+
+/* --- Note Toggle Button --- */
+.note-btn {
+  background: none;
+  border: none;
+  color: var(--text3);
+  cursor: pointer;
+  font-size: 0.7rem;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  transition: transform var(--transition-fast);
+  display: inline-flex;
+}
+
+.note-btn:hover { color: var(--accent); }
+.note-btn.has-note { color: var(--accent); }
+.note-btn.open { transform: rotate(90deg); }
+
+.note-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   MODAL (shared between config and help)
+   ========================================================================== */
+.config-backdrop {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: var(--z-backdrop);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.config-backdrop.active { display: block; }
+
+/* ==========================================================================
+   CONFIG PANEL
+   ========================================================================== */
+.config-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(600px, 90vw);
+  max-height: 80vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border-radius: var(--radius-xl);
+  padding: var(--space-6);
+  display: none;
+  border: 1px solid var(--border);
+  z-index: var(--z-modal);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.config-panel.active { display: block; }
+
+.cfg-hint {
+  font-size: 0.7rem;
+  color: var(--text3);
+  margin-bottom: var(--space-4);
+  text-align: center;
+}
+
+.cfg-section {
+  margin-bottom: var(--space-5);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.cfg-section:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.cfg-section h3 {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text3);
+  margin-bottom: var(--space-3);
+}
+
+.cfg-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.cfg-row label {
+  font-size: var(--text-base);
+  color: var(--text2);
+  min-width: 120px;
+}
+
+.cfg-row input[type="text"] {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 5px var(--space-2);
+  border-radius: var(--radius-md);
+  font-size: var(--text-base);
+}
+
+.cfg-row input[type="text"]:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.cfg-row input[type="color"] {
+  width: 32px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 2px;
+  cursor: pointer;
+  background: var(--bg);
+}
+
+.cfg-row select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 5px var(--space-2);
+  border-radius: var(--radius-md);
+  font-size: var(--text-base);
+  cursor: pointer;
+}
+
+.cfg-del {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text3);
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 0.7rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cfg-del:hover {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+
+.cfg-add-btn {
+  background: none;
+  border: 1px dashed var(--border);
+  color: var(--text3);
+  padding: var(--space-2) 14px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 0.75rem;
+  width: 100%;
+  margin-top: var(--space-1);
+}
+
+.cfg-add-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.quadrants-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: var(--space-2);
+}
+
+.quadrants-grid .cfg-row { margin-bottom: 0; }
+
+/* ==========================================================================
+   HELP PANEL
+   ========================================================================== */
+.help-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(800px, 90vw);
+  max-height: 80vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border-radius: var(--radius-xl);
+  padding: 0;
+  display: none;
+  border: 1px solid var(--border);
+  z-index: var(--z-modal);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.help-panel.active { display: block; }
+
+.help-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  z-index: 1;
+}
+
+.help-tab {
+  padding: var(--space-3) var(--space-5);
+  font-size: 0.78rem;
+  cursor: pointer;
+  color: var(--text3);
+  border: none;
+  background: none;
+  border-bottom: 2px solid transparent;
+  transition: all var(--transition-fast);
+}
+
+.help-tab:hover { color: var(--text); }
+.help-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+.help-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.help-content {
+  padding: var(--space-6);
+  font-size: 0.82rem;
+  line-height: 1.7;
+  color: var(--text2);
+}
+
+.help-content h2 { font-size: var(--text-lg); color: var(--text); margin: 0 0 var(--space-2); }
+.help-content h3 { font-size: var(--text-md); color: var(--text); margin: var(--space-4) 0 var(--space-2); }
+.help-content p { margin: 0 0 var(--space-3); }
+.help-content ul { margin: 0 0 var(--space-3); padding-left: var(--space-5); }
+.help-content li { margin-bottom: var(--space-1); }
+
+.help-content kbd {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 1px 5px;
+  font-size: 0.75rem;
+  font-family: inherit;
+}
+
+/* ==========================================================================
+   FULLSCREEN OVERLAY
+   ========================================================================== */
+.fullscreen-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--bg);
+  z-index: var(--z-fullscreen);
+  padding: var(--space-6);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.fullscreen-overlay.active { display: flex; }
+.fullscreen-overlay canvas { max-width: 90vmin; max-height: 90vmin; }
+
+.fullscreen-close {
+  position: fixed;
+  top: var(--space-4);
+  right: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text2);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  font-size: var(--text-base);
+  z-index: var(--z-fullscreen-controls);
+  pointer-events: auto;
+}
+
+/* ==========================================================================
+   STATE CLASSES
+   Kept separate so the toggling logic is obvious at a glance.
+   ========================================================================== */
+.active { /* Generic active — used by modals, tabs, fullscreen. Scoped per component above. */ }
+.disabled { /* Used by legend items. Scoped in .legend-item.disabled above. */ }
+.highlighted { /* Used by table rows. Scoped in tbody tr.highlighted above. */ }
+.open { /* Used by notes-row, note-btn. Scoped above. */ }
+</style>
+</head>
+<body>
+<a href="#main-content" class="sr-only sr-only-focusable">Skip to main content</a>
+<header class="app-bar" role="banner">
+  <div class="app-bar-title">
+    <span style="display:flex;align-items:center;gap:10px">
+      <svg class="app-icon" width="32" height="32" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="12" fill="var(--icon-bg)"/><circle cx="20" cy="20" r="8" fill="#0077BB" opacity="0.9"/><circle cx="40" cy="16" r="11" fill="#009988" opacity="0.9"/><circle cx="28" cy="40" r="6" fill="#EE7733" opacity="0.9"/><line x1="1" y1="32" x2="63" y2="32" stroke="currentColor" stroke-opacity="0.15" stroke-width="1"/><line x1="21" y1="1" x2="21" y2="63" stroke="currentColor" stroke-opacity="0.15" stroke-width="1"/><line x1="42" y1="1" x2="42" y2="63" stroke="currentColor" stroke-opacity="0.15" stroke-width="1"/></svg>
+      <span><h1 id="pageTitle">PriorityMap</h1><span class="subtitle" id="pageSubtitle">Strategic Priority Visualization</span></span>
+    </span>
+  </div>
+  <nav class="toolbar" aria-label="Main toolbar">
+    <div class="btn-group" role="group" aria-label="File operations">
+      <label for="fileInput" id="loadLabel" style="display:none" title="Load JSON file" tabindex="0" role="button"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 15v4a2 2 0 002 2h14a2 2 0 002-2v-4M7 10l5 5 5-5M12 15V3"/></svg> Load</label>
+      <button id="loadBtn" title="Load JSON file" aria-label="Load JSON file"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 15v4a2 2 0 002 2h14a2 2 0 002-2v-4M7 10l5 5 5-5M12 15V3"/></svg> Load</button>
+      <button id="saveBtn" title="Save to file" aria-label="Save to file"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save</button>
+      <button id="csvBtn" title="Export as CSV spreadsheet" aria-label="Export as CSV"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg> CSV</button>
+    </div>
+    <div class="btn-group" role="group" aria-label="Edit operations">
+      <button id="addBtn" title="Add new initiative" aria-label="Add new initiative"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add</button>
+      <button id="undoBtn" disabled title="Undo last change" aria-label="Undo"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg></button>
+      <button id="redoBtn" disabled title="Redo" aria-label="Redo"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.13-9.36L23 10"/></svg></button>
+    </div>
+    <div class="btn-group" role="group" aria-label="View options">
+      <button id="fullscreenBtn" title="Fullscreen chart view" aria-label="Fullscreen chart"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+      <button id="themeBtn" title="Toggle light/dark mode" aria-label="Toggle theme"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg></button>
+      <button id="configBtn" title="Configuration" aria-label="Open configuration"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></button>
+    </div>
+    <button id="helpBtn" title="Help &amp; user guide" aria-label="Help" class="toolbar-help-btn">?</button>
+    <input type="file" id="fileInput" accept=".json" aria-label="Choose JSON file to load">
+  </nav>
+</header>
+
+<main class="content" id="main-content">
+<div class="main-layout">
+<div class="chart-wrapper">
+  <div class="chart-box" role="img" aria-label="Bubble chart showing initiatives plotted by cost/complexity vs benefits impact"><canvas id="chart"></canvas></div>
+  <div class="legend" id="legend" role="group" aria-label="Chart legend - click to toggle outcome visibility"></div>
+</div>
+<section class="grid-section" aria-label="Initiatives data table">
+  <h2>Initiatives</h2>
+  <div class="grid-scroll">
+  <table aria-label="Initiatives list"><thead id="tableHead"><tr>
+    <th data-col="id" scope="col" tabindex="0" aria-sort="none">#</th>
+    <th data-col="title" scope="col" tabindex="0" aria-sort="none">Initiative</th>
+    <th data-col="costComplexity" scope="col" tabindex="0" aria-sort="none">Cost / Complexity</th>
+    <th data-col="benefitsImpact" scope="col" tabindex="0" aria-sort="none">Potential Benefits Impact</th>
+    <th data-col="importance" scope="col" tabindex="0" aria-sort="none">Importance</th>
+    <th data-col="outcome" scope="col" tabindex="0" aria-sort="none">Outcome</th>
+    <th data-col="timeline" scope="col" tabindex="0" aria-sort="none">Timeline</th>
+    <th scope="col"><span class="sr-only">Actions</span></th>
+  </tr></thead><tbody id="grid"></tbody></table>
+  </div>
+</section>
+</div>
+</main>
+
+<div class="config-backdrop" id="configBackdrop"></div>
+<div class="config-panel" id="configPanel" role="dialog" aria-labelledby="configPanelTitle" aria-modal="true">
+  <h2 id="configPanelTitle" class="sr-only">Configuration</h2>
+  <p class="cfg-hint">Changes apply automatically</p>
+  <div class="cfg-section">
+    <h3>Page Title</h3>
+    <div class="cfg-row"><label for="cfgTitle">Title</label><input type="text" id="cfgTitle"></div>
+    <div class="cfg-row"><label for="cfgSubtitle">Subtitle</label><input type="text" id="cfgSubtitle"></div>
+  </div>
+  <div class="cfg-section">
+    <h3>Outcome Categories</h3>
+    <div id="outcomesList"></div>
+    <button class="cfg-add-btn" id="addOutcomeBtn">+ Add Outcome</button>
+  </div>
+  <div class="cfg-section">
+    <h3>Dimension Labels</h3>
+    <div class="cfg-row"><label for="cfgXLabel">X-Axis (horizontal)</label><input type="text" id="cfgXLabel"></div>
+    <div class="cfg-row"><label for="cfgYLabel">Y-Axis (vertical)</label><input type="text" id="cfgYLabel"></div>
+    <div class="cfg-row"><label for="cfgSizeLabel">Bubble size</label><input type="text" id="cfgSizeLabel"></div>
+  </div>
+  <div class="cfg-section">
+    <h3>Quadrant Labels</h3>
+    <div id="quadrantsList"></div>
+  </div>
+  <div class="cfg-section">
+    <h3>Settings</h3>
+    <div class="cfg-row"><label for="cfgTextSize">Chart text size</label><select id="cfgTextSize"><option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option></select></div>
+    <div class="cfg-row"><label for="cfgDefaultTheme">Default theme</label><select id="cfgDefaultTheme"><option value="light">Light</option><option value="dark">Dark</option></select></div>
+  </div>
+</div>
+
+<!-- Help modal -->
+<div class="config-backdrop" id="helpBackdrop"></div>
+<div class="help-panel" id="helpPanel" role="dialog" aria-labelledby="helpPanelTitle" aria-modal="true">
+  <h2 id="helpPanelTitle" class="sr-only">Help &amp; User Guide</h2>
+  <div class="help-tabs" role="tablist" aria-label="Help sections"></div>
+  <div class="help-content" id="helpContent" role="tabpanel"></div>
+</div>
+
+<!-- Fullscreen overlay -->
+<div class="fullscreen-overlay" id="fullscreenOverlay" role="dialog" aria-label="Fullscreen chart view" aria-modal="true">
+  <button class="fullscreen-close" id="fullscreenCloseBtn" aria-label="Exit fullscreen">Exit Fullscreen</button>
+  <canvas id="fullscreenChart" aria-label="Fullscreen bubble chart"></canvas>
+</div>
+
+<div aria-live="polite" aria-atomic="true" id="announcer" class="sr-only"></div>
+
+<script>
+'use strict';
+
+// ============================================================
+// Application State Manager
+// Encapsulates all mutable state and provides controlled access
+// ============================================================
+const AppState = (() => {
+  const MAX_UNDO = 50;
+  let _config = {
+    matrix: {
+      xAxis: { label: "Cost / Complexity", min: 1, max: 10 },
+      yAxis: { label: "Potential Benefits Impact", min: 1, max: 10 },
+      sizeLabel: "Importance"
+    },
+    quadrants: [
+      { name: "STRATEGIC QUICK WINS", xBounds: [1, 4], yBounds: [7, 10] },
+      { name: "STRATEGIC PRIORITIES", xBounds: [4, 7], yBounds: [7, 10] },
+      { name: "STRATEGIC TRANSFORMATIONS", xBounds: [7, 10], yBounds: [7, 10] },
+      { name: "TACTICAL QUICK WINS", xBounds: [1, 4], yBounds: [4, 7] },
+      { name: "MAINTAIN / MONITOR", xBounds: [4, 7], yBounds: [4, 7] },
+      { name: "RECONSIDER SCOPE", xBounds: [7, 10], yBounds: [4, 7] },
+      { name: "LOW-EFFORT FILLERS", xBounds: [1, 4], yBounds: [1, 4] },
+      { name: "DEPRIORITIZE", xBounds: [4, 7], yBounds: [1, 4] },
+      { name: "QUESTIONABLE", xBounds: [7, 10], yBounds: [1, 4] }
+    ],
+    outcomes: {
+      "Accelerate Revenue Growth": "#0077BB",
+      "Mitigate Risk": "#EE7733",
+      "Improve Operational Efficiency": "#009988"
+    }
+  };
+  let _items = [];
+  let _settings = { textSize: 'small', defaultTheme: 'light', title: 'PriorityMap', subtitle: 'Strategic Priority Visualization' };
+  let _hiddenOutcomes = new Set();
+  let _sortCol = null;
+  let _sortAsc = true;
+  let _highlightedId = null;
+  let _hoveredId = null;
+  let _undoStack = [];
+  let _redoStack = [];
+
+  return {
+    get config() { return _config; },
+    set config(val) { _config = val; },
+    get items() { return _items; },
+    set items(val) { _items = val; },
+    get settings() { return _settings; },
+    set settings(val) { _settings = val; },
+    get hiddenOutcomes() { return _hiddenOutcomes; },
+    get sortCol() { return _sortCol; },
+    set sortCol(val) { _sortCol = val; },
+    get sortAsc() { return _sortAsc; },
+    set sortAsc(val) { _sortAsc = val; },
+    get highlightedId() { return _highlightedId; },
+    set highlightedId(val) { _highlightedId = val; },
+    get hoveredId() { return _hoveredId; },
+    set hoveredId(val) { _hoveredId = val; },
+
+    findItemById(id) {
+      return _items.find(it => it.id === id);
+    },
+
+    getNextId() {
+      return _items.length ? Math.max(..._items.map(i => i.id)) + 1 : 1;
+    },
+
+    saveSnapshot() {
+      _undoStack.push(JSON.stringify({ items: _items, config: _config }));
+      if (_undoStack.length > MAX_UNDO) _undoStack.shift();
+      _redoStack = [];
+    },
+
+    undo() {
+      if (!_undoStack.length) return false;
+      _redoStack.push(JSON.stringify({ items: _items, config: _config }));
+      const snapshot = JSON.parse(_undoStack.pop());
+      _items = snapshot.items;
+      _config = snapshot.config;
+      return true;
+    },
+
+    redo() {
+      if (!_redoStack.length) return false;
+      _undoStack.push(JSON.stringify({ items: _items, config: _config }));
+      const snapshot = JSON.parse(_redoStack.pop());
+      _items = snapshot.items;
+      _config = snapshot.config;
+      return true;
+    },
+
+    get canUndo() { return _undoStack.length > 0; },
+    get canRedo() { return _redoStack.length > 0; },
+
+    resetHistory() {
+      _undoStack = [];
+      _redoStack = [];
+      _hiddenOutcomes.clear();
+      _sortCol = null;
+      _sortAsc = true;
+      _highlightedId = null;
+    },
+
+    getOutcomeColor(name) {
+      return _config.outcomes[name] || '#888888';
+    },
+
+    getOutcomeNames() {
+      return Object.keys(_config.outcomes);
+    },
+
+    getSortedItems() {
+      if (!_sortCol) return [..._items];
+      const sorted = [..._items].sort((a, b) => {
+        const va = a[_sortCol];
+        const vb = b[_sortCol];
+        if (typeof va === 'string') return va.localeCompare(vb);
+        return va - vb;
+      });
+      return _sortAsc ? sorted : sorted.reverse();
+    }
+  };
+})();
+
+// ============================================================
+// DOM Utilities — safe element creation, no innerHTML for user data
+// ============================================================
+const DOM = {
+  /**
+   * Create an element with attributes and children.
+   * Attributes are set safely via setAttribute/property assignment.
+   * Children can be strings (text nodes) or elements.
+   */
+  el(tag, attrs = {}, ...children) {
+    const element = document.createElement(tag);
+    for (const [key, val] of Object.entries(attrs)) {
+      if (key === 'className') {
+        element.className = val;
+      } else if (key === 'style' && typeof val === 'object') {
+        Object.assign(element.style, val);
+      } else if (key.startsWith('on') && typeof val === 'function') {
+        element.addEventListener(key.slice(2).toLowerCase(), val);
+      } else if (key === 'dataset') {
+        Object.assign(element.dataset, val);
+      } else if (key === 'checked' || key === 'disabled' || key === 'selected') {
+        element[key] = val;
+      } else if (val !== null && val !== undefined && val !== false) {
+        element.setAttribute(key, val);
+      }
+    }
+    for (const child of children) {
+      if (child == null) continue;
+      if (typeof child === 'string' || typeof child === 'number') {
+        element.appendChild(document.createTextNode(child));
+      } else if (child instanceof Node) {
+        element.appendChild(child);
+      }
+    }
+    return element;
+  },
+
+  /**
+   * Clear all children of an element.
+   */
+  clear(element) {
+    while (element.firstChild) {
+      element.removeChild(element.firstChild);
+    }
+  },
+
+  /**
+   * Announce a message to screen readers via live region.
+   */
+  announce(message) {
+    const announcer = document.getElementById('announcer');
+    if (announcer) {
+      announcer.textContent = message;
+      setTimeout(() => { announcer.textContent = ''; }, 1000);
+    }
+  }
+};
+
+// ============================================================
+// Input Validation
+// ============================================================
+const Validate = {
+  /**
+   * Validate a loaded JSON state object. Returns { valid, errors }.
+   */
+  loadedState(state) {
+    const errors = [];
+    if (state == null || typeof state !== 'object') {
+      return { valid: false, errors: ['File does not contain a valid JSON object.'] };
+    }
+    if (state.items != null) {
+      if (!Array.isArray(state.items)) {
+        errors.push('items must be an array.');
+      } else {
+        for (let i = 0; i < state.items.length; i++) {
+          const it = state.items[i];
+          if (typeof it !== 'object' || it == null) {
+            errors.push(`items[${i}] is not a valid object.`);
+            continue;
+          }
+          if (typeof it.id !== 'number') errors.push(`items[${i}].id must be a number.`);
+          if (typeof it.title !== 'string') errors.push(`items[${i}].title must be a string.`);
+          if (typeof it.costComplexity !== 'number' || it.costComplexity < 1 || it.costComplexity > 10) {
+            errors.push(`items[${i}].costComplexity must be a number between 1 and 10.`);
+          }
+          if (typeof it.benefitsImpact !== 'number' || it.benefitsImpact < 1 || it.benefitsImpact > 10) {
+            errors.push(`items[${i}].benefitsImpact must be a number between 1 and 10.`);
+          }
+          if (typeof it.importance !== 'number' || it.importance < 1 || it.importance > 10) {
+            errors.push(`items[${i}].importance must be a number between 1 and 10.`);
+          }
+        }
+      }
+    }
+    if (state.config != null && typeof state.config !== 'object') {
+      errors.push('config must be an object.');
+    }
+    if (state.config && state.config.outcomes != null && typeof state.config.outcomes !== 'object') {
+      errors.push('config.outcomes must be an object.');
+    }
+    if (state.settings != null && typeof state.settings !== 'object') {
+      errors.push('settings must be an object.');
+    }
+    return { valid: errors.length === 0, errors };
+  },
+
+  /**
+   * Sanitize a color string to prevent injection. Returns valid hex or fallback.
+   */
+  color(input) {
+    if (typeof input !== 'string') return '#888888';
+    const match = input.match(/^#[0-9a-fA-F]{3,8}$/);
+    return match ? input : '#888888';
+  },
+
+  /**
+   * Clamp a number to a range.
+   */
+  clamp(val, min, max) {
+    return Math.max(min, Math.min(max, Math.round(Number(val) || min)));
+  }
+};
+
+// ============================================================
+// Chart Module
+// ============================================================
+const ChartModule = (() => {
+  let _chart = null;
+  let _fullscreenChart = null;
+  let _hoveredElement = null;
+  let _isDragging = false;
+  let _dragItem = null;
+
+  const BUBBLE_SIZE_MULTIPLIER = 5.5;
+  const BUBBLE_MIN_RADIUS = 12;
+  const CHART_PADDING = 40;
+
+  function isDark() {
+    return document.documentElement.getAttribute('data-theme') === 'dark';
+  }
+
+  function getTextSizePx() { return { small: 9, medium: 11, large: 13 }[AppState.settings.textSize] || 9; }
+  function getLabelFontSize() { return { small: 12, medium: 14, large: 16 }[AppState.settings.textSize] || 12; }
+  function getAxisFontSize() { return { small: 11, medium: 13, large: 15 }[AppState.settings.textSize] || 11; }
+  function getTickFontSize() { return { small: 10, medium: 12, large: 14 }[AppState.settings.textSize] || 10; }
+
+  const quadrantPlugin = {
+    id: 'quadrantBg',
+    beforeDraw(ch) {
+      const { ctx, scales: { x, y } } = ch;
+      const dark = isDark();
+      const bgColor = dark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)';
+      const labelColor = dark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)';
+      const strokeColor = dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+      AppState.config.quadrants.forEach((q) => {
+        const x1 = x.getPixelForValue(q.xBounds[0]);
+        const x2 = x.getPixelForValue(q.xBounds[1]);
+        const y1 = y.getPixelForValue(q.yBounds[1]);
+        const y2 = y.getPixelForValue(q.yBounds[0]);
+        ctx.fillStyle = bgColor;
+        ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
+        ctx.strokeStyle = strokeColor;
+        ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+        ctx.fillStyle = labelColor;
+        ctx.font = getTextSizePx() + 'px sans-serif';
+        ctx.textAlign = 'center';
+        const labelY = q.yBounds[1] <= 4 ? y2 - 8 : y1 + getTextSizePx() + 4;
+        ctx.fillText(q.name, (x1 + x2) / 2, labelY);
+      });
+    }
+  };
+
+  const glowLabelPlugin = {
+    id: 'glowLabels',
+    afterDatasetsDraw(ch) {
+      const { ctx } = ch;
+      const highlightedId = AppState.highlightedId;
+      const hoveredId = AppState.hoveredId;
+
+      // Highlight ring (click selection)
+      if (highlightedId !== null) {
+        ch.data.datasets.forEach((ds, dsIdx) => {
+          const meta = ch.getDatasetMeta(dsIdx);
+          if (meta.hidden) return;
+          meta.data.forEach((el, i) => {
+            if (ds.data[i] && ds.data[i].id === highlightedId) {
+              ctx.save();
+              ctx.strokeStyle = isDark() ? '#fff' : '#000';
+              ctx.lineWidth = 3;
+              ctx.setLineDash([5, 3]);
+              ctx.beginPath();
+              ctx.arc(el.x, el.y, el.options.radius + 6, 0, Math.PI * 2);
+              ctx.stroke();
+              ctx.restore();
+            }
+          });
+        });
+      }
+
+      // Hover ring
+      if (hoveredId !== null && hoveredId !== highlightedId) {
+        ch.data.datasets.forEach((ds, dsIdx) => {
+          const meta = ch.getDatasetMeta(dsIdx);
+          if (meta.hidden) return;
+          meta.data.forEach((el, i) => {
+            if (ds.data[i] && ds.data[i].id === hoveredId) {
+              ctx.save();
+              ctx.globalAlpha = 0.5;
+              ctx.strokeStyle = isDark() ? '#fff' : '#000';
+              ctx.lineWidth = 3;
+              ctx.setLineDash([5, 3]);
+              ctx.beginPath();
+              ctx.arc(el.x, el.y, el.options.radius + 6, 0, Math.PI * 2);
+              ctx.stroke();
+              ctx.restore();
+            }
+          });
+        });
+      }
+
+      // Glow on hover
+      if (_hoveredElement) {
+        const { el, color } = _hoveredElement;
+        ctx.save();
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 20;
+        ctx.beginPath();
+        ctx.arc(el.x, el.y, el.options.radius, 0, Math.PI * 2);
+        ctx.fillStyle = Validate.color(color) + '44';
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // ID labels on bubbles
+      ch.data.datasets.forEach((ds, dsIdx) => {
+        const meta = ch.getDatasetMeta(dsIdx);
+        if (meta.hidden) return;
+        meta.data.forEach((el, i) => {
+          const item = ds.data[i];
+          if (!item) return;
+          ctx.fillStyle = '#fff';
+          ctx.font = 'bold ' + getLabelFontSize() + 'px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(item.id, el.x, el.y);
+        });
+      });
+    }
+  };
+
+  function getChartOptions(dark) {
+    const cfg = AppState.config;
+    return {
+      responsive: true,
+      maintainAspectRatio: true,
+      aspectRatio: 1,
+      animation: false,
+      clip: false,
+      layout: { padding: CHART_PADDING },
+      onHover(evt, elements) {
+        if (_isDragging) return;
+        const ch = evt.chart;
+        if (elements.length) {
+          const el = elements[0].element;
+          const dsIndex = elements[0].datasetIndex;
+          const color = AppState.getOutcomeColor(AppState.getOutcomeNames()[dsIndex]);
+          _hoveredElement = { el, color };
+        } else {
+          _hoveredElement = null;
+        }
+        ch.draw();
+      },
+      scales: {
+        x: {
+          min: cfg.matrix.xAxis.min,
+          max: cfg.matrix.xAxis.max,
+          title: { display: true, text: cfg.matrix.xAxis.label, color: dark ? '#888' : '#666', font: { size: getAxisFontSize() } },
+          grid: { color: dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.05)' },
+          ticks: { color: dark ? '#666' : '#888', stepSize: 1, font: { size: getTickFontSize() } }
+        },
+        y: {
+          min: cfg.matrix.yAxis.min,
+          max: cfg.matrix.yAxis.max,
+          title: { display: true, text: cfg.matrix.yAxis.label, color: dark ? '#888' : '#666', font: { size: getAxisFontSize() } },
+          grid: { color: dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.05)' },
+          ticks: { color: dark ? '#666' : '#888', stepSize: 1, font: { size: getTickFontSize() } }
+        }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          enabled: !_isDragging,
+          callbacks: {
+            label(ctx) {
+              const it = AppState.findItemById(ctx.raw.id);
+              if (!it) return '';
+              return `${it.title}  [${it.costComplexity}, ${it.benefitsImpact}, ${it.importance}]`;
+            }
+          }
+        }
+      }
+    };
+  }
+
+  function getDatasets() {
+    return AppState.getOutcomeNames().map(outcome => {
+      const color = Validate.color(AppState.getOutcomeColor(outcome));
+      return {
+        label: outcome,
+        backgroundColor: color + 'cc',
+        borderColor: color,
+        borderWidth: 2,
+        hidden: AppState.hiddenOutcomes.has(outcome),
+        hoverRadius: 0,
+        data: AppState.items
+          .filter(it => it.outcome === outcome && !AppState.hiddenOutcomes.has(outcome))
+          .map(it => ({
+            x: it.costComplexity,
+            y: it.benefitsImpact,
+            r: Math.max(BUBBLE_MIN_RADIUS, it.importance * BUBBLE_SIZE_MULTIPLIER),
+            id: it.id
+          }))
+      };
+    });
+  }
+
+  function setupDrag() {
+    const canvas = document.getElementById('chart');
+    canvas.addEventListener('mousedown', (e) => {
+      if (!_chart) return;
+      const elements = _chart.getElementsAtEventForMode(e, 'nearest', { intersect: true }, false);
+      if (!elements.length) return;
+      const ds = _chart.data.datasets[elements[0].datasetIndex];
+      const pt = ds.data[elements[0].index];
+      _dragItem = AppState.findItemById(pt.id);
+      if (_dragItem) {
+        _isDragging = true;
+        AppState.saveSnapshot();
+        canvas.style.cursor = 'grabbing';
+      }
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+      if (!_isDragging || !_dragItem || !_chart) return;
+      const rect = canvas.getBoundingClientRect();
+      const cfg = AppState.config;
+      const x = _chart.scales.x.getValueForPixel(e.clientX - rect.left);
+      const y = _chart.scales.y.getValueForPixel(e.clientY - rect.top);
+      _dragItem.costComplexity = Validate.clamp(x, cfg.matrix.xAxis.min, cfg.matrix.xAxis.max);
+      _dragItem.benefitsImpact = Validate.clamp(y, cfg.matrix.yAxis.min, cfg.matrix.yAxis.max);
+      _chart.data.datasets = getDatasets();
+      _chart.update('none');
+      GridModule.render();
+    });
+
+    const endDrag = () => {
+      if (_isDragging) {
+        _isDragging = false;
+        _dragItem = null;
+        canvas.style.cursor = '';
+        ToolbarModule.updateUndoButtons();
+      }
+    };
+    canvas.addEventListener('mouseup', endDrag);
+    canvas.addEventListener('mouseleave', endDrag);
+  }
+
+  return {
+    build() {
+      if (_chart) _chart.destroy();
+      const dark = isDark();
+      _chart = new Chart(document.getElementById('chart'), {
+        type: 'bubble',
+        data: { datasets: getDatasets() },
+        options: getChartOptions(dark),
+        plugins: [quadrantPlugin, glowLabelPlugin]
+      });
+      this.buildLegend();
+      setupDrag();
+    },
+
+    buildLegend() {
+      const legendEl = document.getElementById('legend');
+      DOM.clear(legendEl);
+      const fontSize = { small: '0.75rem', medium: '0.85rem', large: '0.95rem' }[AppState.settings.textSize] || '0.75rem';
+
+      AppState.getOutcomeNames().forEach(name => {
+        const color = Validate.color(AppState.getOutcomeColor(name));
+        const isDisabled = AppState.hiddenOutcomes.has(name);
+        const btn = DOM.el('button', {
+          className: 'legend-item' + (isDisabled ? ' disabled' : ''),
+          style: { fontSize },
+          'aria-pressed': String(!isDisabled),
+          'aria-label': `Toggle ${name} visibility`,
+          onClick() {
+            if (AppState.hiddenOutcomes.has(name)) {
+              AppState.hiddenOutcomes.delete(name);
+            } else {
+              AppState.hiddenOutcomes.add(name);
+            }
+            ChartModule.build();
+            DOM.announce(`${name} ${AppState.hiddenOutcomes.has(name) ? 'hidden' : 'visible'}`);
+          }
+        },
+          DOM.el('span', { className: 'legend-swatch', style: { background: color, borderColor: color } }),
+          name
+        );
+        legendEl.appendChild(btn);
+      });
+    },
+
+    redraw() {
+      if (_chart) _chart.draw();
+    },
+
+    enterFullscreen() {
+      const overlay = document.getElementById('fullscreenOverlay');
+      overlay.classList.add('active');
+      if (_fullscreenChart) _fullscreenChart.destroy();
+      const dark = isDark();
+      _fullscreenChart = new Chart(document.getElementById('fullscreenChart'), {
+        type: 'bubble',
+        data: { datasets: getDatasets() },
+        options: { ...getChartOptions(dark), maintainAspectRatio: true, aspectRatio: 1 },
+        plugins: [quadrantPlugin, glowLabelPlugin]
+      });
+      document.getElementById('fullscreenCloseBtn').focus();
+    },
+
+    exitFullscreen() {
+      document.getElementById('fullscreenOverlay').classList.remove('active');
+      if (_fullscreenChart) {
+        _fullscreenChart.destroy();
+        _fullscreenChart = null;
+      }
+    }
+  };
+})();
+
+
+// ============================================================
+// Grid Module — DOM-based rendering (no innerHTML with user data)
+// ============================================================
+const GridModule = (() => {
+  function createSliderCell(item, field, label) {
+    const val = item[field];
+    const valSpan = DOM.el('span', { className: 'slider-val', 'aria-hidden': 'true' }, String(val));
+    const input = DOM.el('input', {
+      type: 'range',
+      min: '1',
+      max: '10',
+      step: '1',
+      value: String(val),
+      'aria-label': `${label} for ${item.title}`,
+      'aria-valuemin': '1',
+      'aria-valuemax': '10',
+      'aria-valuenow': String(val),
+      onMousedown() { AppState.saveSnapshot(); },
+      onInput(e) {
+        valSpan.textContent = e.target.value;
+        e.target.setAttribute('aria-valuenow', e.target.value);
+      },
+      onChange(e) {
+        item[field] = Validate.clamp(e.target.value, 1, 10);
+        ChartModule.build();
+        ToolbarModule.updateUndoButtons();
+      }
+    });
+    input.addEventListener('click', (e) => e.stopPropagation());
+    return DOM.el('div', { className: 'slider-cell' }, input, valSpan);
+  }
+
+  function createRow(item) {
+    const isHighlighted = item.id === AppState.highlightedId;
+    const hasNote = Boolean(item.notes);
+
+    const tr = DOM.el('tr', {
+      className: isHighlighted ? 'highlighted' : '',
+      'aria-selected': String(isHighlighted),
+      onClick(e) {
+        if (e.target.closest('input, select, button, textarea')) return;
+        AppState.highlightedId = AppState.highlightedId === item.id ? null : item.id;
+        GridModule.render();
+        ChartModule.build();
+      },
+      onMouseenter() {
+        AppState.hoveredId = item.id;
+        ChartModule.redraw();
+      },
+      onMouseleave() {
+        AppState.hoveredId = null;
+        ChartModule.redraw();
+      }
+    });
+
+    // ID cell
+    tr.appendChild(DOM.el('td', { style: { color: 'var(--text3)', fontWeight: '600' } }, String(item.id)));
+
+    // Title cell with note toggle
+    const noteBtn = DOM.el('button', {
+      className: 'note-btn' + (hasNote ? ' has-note' : ''),
+      title: 'Toggle notes',
+      'aria-label': `Toggle notes for ${item.title}`,
+      'aria-expanded': 'false',
+      onClick(e) {
+        e.stopPropagation();
+        const noteRow = document.getElementById('notes-' + item.id);
+        if (noteRow) {
+          const isOpen = noteRow.classList.toggle('open');
+          noteBtn.classList.toggle('open', isOpen);
+          noteBtn.setAttribute('aria-expanded', String(isOpen));
+        }
+      }
+    });
+    noteBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>';
+
+    const titleInput = DOM.el('input', {
+      type: 'text',
+      value: item.title,
+      'aria-label': `Initiative name for item ${item.id}`,
+      onChange(e) {
+        AppState.saveSnapshot();
+        item.title = e.target.value;
+        ToolbarModule.updateUndoButtons();
+      }
+    });
+    titleInput.addEventListener('click', (e) => e.stopPropagation());
+
+    const titleWrapper = DOM.el('span', { style: { display: 'inline-flex', alignItems: 'center', gap: '4px', width: '100%' } }, noteBtn, titleInput);
+    tr.appendChild(DOM.el('td', { className: 'init-col' }, titleWrapper));
+
+    // Slider cells
+    tr.appendChild(DOM.el('td', {}, createSliderCell(item, 'costComplexity', AppState.config.matrix.xAxis.label)));
+    tr.appendChild(DOM.el('td', {}, createSliderCell(item, 'benefitsImpact', AppState.config.matrix.yAxis.label)));
+    tr.appendChild(DOM.el('td', {}, createSliderCell(item, 'importance', AppState.config.matrix.sizeLabel || 'Importance')));
+
+    // Outcome select
+    const outcomeSelect = DOM.el('select', {
+      'aria-label': `Outcome category for ${item.title}`,
+      onChange(e) {
+        AppState.saveSnapshot();
+        item.outcome = e.target.value;
+        ChartModule.build();
+        ToolbarModule.updateUndoButtons();
+      }
+    });
+    outcomeSelect.addEventListener('click', (e) => e.stopPropagation());
+    AppState.getOutcomeNames().forEach(name => {
+      const opt = DOM.el('option', { value: name, selected: name === item.outcome }, name);
+      outcomeSelect.appendChild(opt);
+    });
+    tr.appendChild(DOM.el('td', {}, outcomeSelect));
+
+    // Timeline select
+    const timelineSelect = DOM.el('select', {
+      'aria-label': `Timeline for ${item.title}`,
+      onChange(e) {
+        AppState.saveSnapshot();
+        item.timeline = e.target.value;
+        ToolbarModule.updateUndoButtons();
+      }
+    });
+    timelineSelect.addEventListener('click', (e) => e.stopPropagation());
+    for (let m = 1; m <= 12; m++) {
+      const val = m + 'm';
+      timelineSelect.appendChild(DOM.el('option', { value: val, selected: val === item.timeline }, val));
+    }
+    tr.appendChild(DOM.el('td', {}, timelineSelect));
+
+    // Actions cell
+    const dupBtn = DOM.el('button', {
+      className: 'dup-btn',
+      title: 'Duplicate',
+      'aria-label': `Duplicate ${item.title}`,
+      onClick(e) {
+        e.stopPropagation();
+        AppState.saveSnapshot();
+        const newId = AppState.getNextId();
+        const idx = AppState.items.indexOf(item);
+        AppState.items.splice(idx + 1, 0, { ...item, id: newId, title: item.title + ' (copy)', notes: item.notes || '' });
+        GridModule.render();
+        ChartModule.build();
+        ToolbarModule.updateUndoButtons();
+        DOM.announce(`Duplicated ${item.title}`);
+      }
+    }, '⧉');
+
+    const delBtn = DOM.el('button', {
+      className: 'del-btn',
+      title: 'Delete',
+      'aria-label': `Delete ${item.title}`,
+      onClick(e) {
+        e.stopPropagation();
+        AppState.saveSnapshot();
+        const idx = AppState.items.indexOf(item);
+        AppState.items.splice(idx, 1);
+        GridModule.render();
+        ChartModule.build();
+        ToolbarModule.updateUndoButtons();
+        DOM.announce(`Deleted ${item.title}`);
+      }
+    }, '✕');
+
+    tr.appendChild(DOM.el('td', {}, DOM.el('div', { className: 'actions-cell' }, dupBtn, delBtn)));
+
+    return tr;
+  }
+
+  function createNotesRow(item) {
+    const notesTr = DOM.el('tr', { className: 'notes-row', id: 'notes-' + item.id });
+    const td = DOM.el('td', { colSpan: '8' });
+    const textarea = DOM.el('textarea', {
+      placeholder: 'Notes...',
+      'aria-label': `Notes for ${item.title}`,
+      onInput(e) {
+        item.notes = e.target.value;
+      }
+    });
+    textarea.addEventListener('click', (e) => e.stopPropagation());
+    textarea.value = item.notes || '';
+    td.appendChild(textarea);
+    notesTr.appendChild(td);
+    return notesTr;
+  }
+
+  return {
+    render() {
+      const tbody = document.getElementById('grid');
+      DOM.clear(tbody);
+      const sorted = AppState.getSortedItems();
+      sorted.forEach(item => {
+        tbody.appendChild(createRow(item));
+        tbody.appendChild(createNotesRow(item));
+      });
+      this.updateSortIndicators();
+    },
+
+    updateSortIndicators() {
+      document.querySelectorAll('#tableHead th[data-col]').forEach(th => {
+        th.classList.remove('sorted', 'desc');
+        th.setAttribute('aria-sort', 'none');
+        if (th.dataset.col === AppState.sortCol) {
+          th.classList.add('sorted');
+          if (!AppState.sortAsc) th.classList.add('desc');
+          th.setAttribute('aria-sort', AppState.sortAsc ? 'ascending' : 'descending');
+        }
+      });
+    }
+  };
+})();
+
+// ============================================================
+// Toolbar Module — button wiring
+// ============================================================
+const ToolbarModule = (() => {
+  return {
+    updateUndoButtons() {
+      document.getElementById('undoBtn').disabled = !AppState.canUndo;
+      document.getElementById('redoBtn').disabled = !AppState.canRedo;
+    },
+
+    init() {
+      document.getElementById('loadBtn').addEventListener('click', FileModule.loadFile);
+      document.getElementById('saveBtn').addEventListener('click', FileModule.exportJSON);
+      document.getElementById('csvBtn').addEventListener('click', FileModule.exportCSV);
+      document.getElementById('addBtn').addEventListener('click', () => {
+        AppState.saveSnapshot();
+        const id = AppState.getNextId();
+        AppState.items.push({
+          id,
+          title: 'New Initiative',
+          costComplexity: 5,
+          benefitsImpact: 5,
+          importance: 5,
+          outcome: AppState.getOutcomeNames()[0] || 'Uncategorized',
+          timeline: '3m',
+          notes: ''
+        });
+        GridModule.render();
+        ChartModule.build();
+        ToolbarModule.updateUndoButtons();
+        DOM.announce('Added new initiative');
+      });
+
+      document.getElementById('undoBtn').addEventListener('click', () => {
+        if (AppState.undo()) {
+          GridModule.render();
+          ChartModule.build();
+          ToolbarModule.updateUndoButtons();
+          DOM.announce('Undone');
+        }
+      });
+
+      document.getElementById('redoBtn').addEventListener('click', () => {
+        if (AppState.redo()) {
+          GridModule.render();
+          ChartModule.build();
+          ToolbarModule.updateUndoButtons();
+          DOM.announce('Redone');
+        }
+      });
+
+      document.getElementById('fullscreenBtn').addEventListener('click', () => ChartModule.enterFullscreen());
+      document.getElementById('themeBtn').addEventListener('click', () => {
+        const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+        document.documentElement.setAttribute('data-theme', dark ? 'light' : 'dark');
+        ChartModule.build();
+      });
+      document.getElementById('configBtn').addEventListener('click', () => ConfigModule.toggle());
+      document.getElementById('helpBtn').addEventListener('click', () => HelpModule.toggle());
+
+      // Table header sort
+      document.getElementById('tableHead').addEventListener('click', (e) => {
+        const th = e.target.closest('th');
+        if (!th || !th.dataset.col) return;
+        const col = th.dataset.col;
+        if (AppState.sortCol === col) {
+          AppState.sortAsc = !AppState.sortAsc;
+        } else {
+          AppState.sortCol = col;
+          AppState.sortAsc = true;
+        }
+        GridModule.render();
+      });
+
+      // Keyboard support for table headers
+      document.getElementById('tableHead').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          const th = e.target.closest('th');
+          if (th && th.dataset.col) {
+            e.preventDefault();
+            th.click();
+          }
+        }
+      });
+
+      // Fullscreen close
+      document.getElementById('fullscreenCloseBtn').addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        ChartModule.exitFullscreen();
+      });
+
+      // Escape key handler
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          ChartModule.exitFullscreen();
+          if (document.getElementById('configPanel').classList.contains('active')) ConfigModule.toggle();
+          if (document.getElementById('helpPanel').classList.contains('active')) HelpModule.toggle();
+        }
+      });
+    }
+  };
+})();
+
+
+// ============================================================
+// File Module — load, save, export with proper error handling
+// ============================================================
+const FileModule = (() => {
+  let _fileHandle = null;
+  const hasFileAPI = 'showOpenFilePicker' in window;
+
+  function applyLoadedState(state) {
+    const validation = Validate.loadedState(state);
+    if (!validation.valid) {
+      const msg = 'Invalid data file:\n' + validation.errors.slice(0, 5).join('\n');
+      alert(msg);
+      throw new Error(msg);
+    }
+    if (state.config) AppState.config = state.config;
+    if (state.settings) AppState.settings = state.settings;
+    if (state.items) AppState.items = state.items;
+    AppState.resetHistory();
+    applySettings();
+    updateTableHeaders();
+    GridModule.render();
+    ChartModule.build();
+    ConfigModule.renderUI();
+    ToolbarModule.updateUndoButtons();
+    DOM.announce('File loaded successfully');
+  }
+
+  function applySettings() {
+    const s = AppState.settings;
+    document.documentElement.setAttribute('data-theme', s.defaultTheme || 'light');
+    document.getElementById('pageTitle').textContent = s.title || 'PriorityMap';
+    document.getElementById('pageSubtitle').textContent = s.subtitle || '';
+    document.getElementById('cfgTitle').value = s.title || '';
+    document.getElementById('cfgSubtitle').value = s.subtitle || '';
+    document.title = s.title || 'PriorityMap';
+  }
+
+  function updateTableHeaders() {
+    const ths = document.querySelectorAll('#tableHead th');
+    ths[2].textContent = AppState.config.matrix.xAxis.label;
+    ths[3].textContent = AppState.config.matrix.yAxis.label;
+    ths[4].textContent = AppState.config.matrix.sizeLabel || 'Importance';
+  }
+
+  function getExportData() {
+    return JSON.stringify({ config: AppState.config, settings: AppState.settings, items: AppState.items }, null, 2);
+  }
+
+  return {
+    get hasFileAPI() { return hasFileAPI; },
+
+    init() {
+      if (!hasFileAPI) {
+        document.getElementById('loadBtn').style.display = 'none';
+        document.getElementById('loadLabel').style.display = '';
+      }
+      document.getElementById('fileInput').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        file.text().then(text => {
+          try {
+            applyLoadedState(JSON.parse(text));
+          } catch (err) {
+            console.error('Failed to parse file:', err);
+          }
+        }).catch(err => {
+          alert('Failed to read file: ' + err.message);
+        });
+        // Reset input so same file can be reloaded
+        e.target.value = '';
+      });
+    },
+
+    async loadFile() {
+      if (hasFileAPI) {
+        try {
+          const [handle] = await window.showOpenFilePicker({
+            types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }]
+          });
+          _fileHandle = handle;
+          const file = await _fileHandle.getFile();
+          const text = await file.text();
+          applyLoadedState(JSON.parse(text));
+        } catch (e) {
+          if (e.name !== 'AbortError') {
+            console.error('Load failed:', e);
+            alert('Failed to load file: ' + e.message);
+          }
+        }
+      } else {
+        document.getElementById('fileInput').click();
+      }
+    },
+
+    async exportJSON() {
+      if (hasFileAPI && _fileHandle) {
+        try {
+          const writable = await _fileHandle.createWritable();
+          await writable.write(getExportData());
+          await writable.close();
+          DOM.announce('File saved');
+        } catch (e) {
+          console.error('Save failed:', e);
+          alert('Failed to save file: ' + e.message);
+        }
+      } else if (hasFileAPI) {
+        try {
+          _fileHandle = await window.showSaveFilePicker({
+            suggestedName: 'prioritymap-data.json',
+            types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }]
+          });
+          const writable = await _fileHandle.createWritable();
+          await writable.write(getExportData());
+          await writable.close();
+          DOM.announce('File saved');
+        } catch (e) {
+          if (e.name !== 'AbortError') {
+            console.error('Save failed:', e);
+            alert('Failed to save file: ' + e.message);
+          }
+        }
+      } else {
+        const blob = new Blob([getExportData()], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'prioritymap-data.json';
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+        DOM.announce('File downloaded');
+      }
+    },
+
+    exportCSV() {
+      const sorted = AppState.getSortedItems();
+      const cfg = AppState.config;
+      const headers = ['ID', 'Initiative', cfg.matrix.xAxis.label, cfg.matrix.yAxis.label, cfg.matrix.sizeLabel || 'Importance', 'Outcome', 'Timeline', 'Notes'];
+      const escapeCsv = (val) => '"' + String(val || '').replace(/"/g, '""') + '"';
+      const rows = sorted.map(it => [
+        it.id,
+        escapeCsv(it.title),
+        it.costComplexity,
+        it.benefitsImpact,
+        it.importance,
+        escapeCsv(it.outcome),
+        it.timeline,
+        escapeCsv(it.notes)
+      ]);
+      const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'prioritymap-data.csv';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      DOM.announce('CSV exported');
+    },
+
+    applySettings,
+    updateTableHeaders
+  };
+})();
+
+// ============================================================
+// Config Module — configuration panel
+// ============================================================
+const ConfigModule = (() => {
+  function renderOutcomes() {
+    const container = document.getElementById('outcomesList');
+    DOM.clear(container);
+    const names = AppState.getOutcomeNames();
+    names.forEach((name, i) => {
+      const color = Validate.color(AppState.config.outcomes[name]);
+      const row = DOM.el('div', { className: 'cfg-row' });
+
+      const colorInput = DOM.el('input', {
+        type: 'color',
+        value: color,
+        'aria-label': `Color for ${name}`,
+        onChange(e) {
+          AppState.config.outcomes[name] = Validate.color(e.target.value);
+          ChartModule.build();
+        }
+      });
+
+      const nameInput = DOM.el('input', {
+        type: 'text',
+        value: name,
+        'aria-label': `Outcome name ${i + 1}`,
+        onChange(e) {
+          const newName = e.target.value.trim();
+          if (!newName || newName === name) return;
+          const newOutcomes = {};
+          Object.keys(AppState.config.outcomes).forEach(k => {
+            newOutcomes[k === name ? newName : k] = AppState.config.outcomes[k];
+          });
+          AppState.config.outcomes = newOutcomes;
+          AppState.items.forEach(it => { if (it.outcome === name) it.outcome = newName; });
+          GridModule.render();
+          ChartModule.build();
+          ConfigModule.renderUI();
+        }
+      });
+
+      const delBtn = DOM.el('button', {
+        className: 'cfg-del',
+        'aria-label': `Delete outcome ${name}`,
+        onClick() {
+          delete AppState.config.outcomes[name];
+          GridModule.render();
+          ChartModule.build();
+          ConfigModule.renderUI();
+        }
+      }, '✕');
+
+      row.appendChild(colorInput);
+      row.appendChild(nameInput);
+      row.appendChild(delBtn);
+      container.appendChild(row);
+    });
+  }
+
+  function renderQuadrants() {
+    const container = document.getElementById('quadrantsList');
+    DOM.clear(container);
+    const gridDiv = DOM.el('div', { className: 'quadrants-grid' });
+    const labels = ['Top-Left', 'Top-Mid', 'Top-Right', 'Mid-Left', 'Mid-Mid', 'Mid-Right', 'Bot-Left', 'Bot-Mid', 'Bot-Right'];
+    AppState.config.quadrants.forEach((q, i) => {
+      const row = DOM.el('div', { className: 'cfg-row', style: { flexDirection: 'column', alignItems: 'stretch', gap: '3px' } });
+      const label = DOM.el('label', { style: { minWidth: 'auto', fontSize: '0.65rem', color: 'var(--text3)' } }, labels[i] || '');
+      const input = DOM.el('input', {
+        type: 'text',
+        value: q.name,
+        style: { fontSize: '0.75rem' },
+        'aria-label': `Quadrant label for ${labels[i]}`,
+        onChange(e) {
+          AppState.config.quadrants[i].name = e.target.value;
+          ChartModule.build();
+        }
+      });
+      row.appendChild(label);
+      row.appendChild(input);
+      gridDiv.appendChild(row);
+    });
+    container.appendChild(gridDiv);
+  }
+
+  return {
+    toggle() {
+      const panel = document.getElementById('configPanel');
+      const backdrop = document.getElementById('configBackdrop');
+      const isOpen = panel.classList.toggle('active');
+      backdrop.classList.toggle('active', isOpen);
+      if (isOpen) {
+        this.renderUI();
+        panel.focus();
+      }
+    },
+
+    renderUI() {
+      renderOutcomes();
+      renderQuadrants();
+      document.getElementById('cfgTextSize').value = AppState.settings.textSize;
+      document.getElementById('cfgDefaultTheme').value = AppState.settings.defaultTheme;
+      document.getElementById('cfgXLabel').value = AppState.config.matrix.xAxis.label;
+      document.getElementById('cfgYLabel').value = AppState.config.matrix.yAxis.label;
+      document.getElementById('cfgSizeLabel').value = AppState.config.matrix.sizeLabel || 'Importance';
+      document.getElementById('cfgTitle').value = AppState.settings.title || '';
+      document.getElementById('cfgSubtitle').value = AppState.settings.subtitle || '';
+    },
+
+    init() {
+      document.getElementById('configBackdrop').addEventListener('click', () => this.toggle());
+      document.getElementById('addOutcomeBtn').addEventListener('click', () => {
+        const num = Object.keys(AppState.config.outcomes).length + 1;
+        AppState.config.outcomes['New Outcome ' + num] = '#888888';
+        GridModule.render();
+        ChartModule.build();
+        this.renderUI();
+      });
+
+      document.getElementById('cfgTitle').addEventListener('change', (e) => {
+        AppState.settings.title = e.target.value;
+        document.getElementById('pageTitle').textContent = AppState.settings.title;
+        document.title = AppState.settings.title || 'PriorityMap';
+      });
+      document.getElementById('cfgSubtitle').addEventListener('change', (e) => {
+        AppState.settings.subtitle = e.target.value;
+        document.getElementById('pageSubtitle').textContent = AppState.settings.subtitle;
+      });
+      document.getElementById('cfgXLabel').addEventListener('change', (e) => {
+        AppState.config.matrix.xAxis.label = e.target.value;
+        FileModule.updateTableHeaders();
+        ChartModule.build();
+      });
+      document.getElementById('cfgYLabel').addEventListener('change', (e) => {
+        AppState.config.matrix.yAxis.label = e.target.value;
+        FileModule.updateTableHeaders();
+        ChartModule.build();
+      });
+      document.getElementById('cfgSizeLabel').addEventListener('change', (e) => {
+        AppState.config.matrix.sizeLabel = e.target.value;
+        FileModule.updateTableHeaders();
+        ChartModule.build();
+      });
+      document.getElementById('cfgTextSize').addEventListener('change', (e) => {
+        AppState.settings.textSize = e.target.value;
+        ChartModule.build();
+      });
+      document.getElementById('cfgDefaultTheme').addEventListener('change', (e) => {
+        AppState.settings.defaultTheme = e.target.value;
+        FileModule.applySettings();
+        ChartModule.build();
+      });
+    }
+  };
+})();
+
+// ============================================================
+// Help Module
+// ============================================================
+const HelpModule = (() => {
+  const tabs = [
+    { label: 'Overview', content: `<h2>Make Better Prioritization Decisions, Together</h2><p>PriorityMap helps teams align on what to build next by making trade-offs visible. Instead of debating priorities in spreadsheets or slide decks, you see every initiative plotted on a single canvas — where position tells the story.</p><h3>The problem it solves</h3><p>Prioritization discussions often stall because stakeholders weigh different factors. Engineering sees complexity; product sees value; leadership sees strategy. This tool puts all three dimensions on one view so everyone works from the same picture.</p><h3>How it helps decision-making</h3><ul><li><strong>Spot misallocations instantly</strong> — high-cost, low-value items stand out in the bottom-right. Quick wins cluster in the top-left.</li><li><strong>Facilitate live trade-off discussions</strong> — drag bubbles during meetings to test "what if we reduce scope?"</li><li><strong>Create alignment across roles</strong> — the visual makes it obvious when too many items compete for the same quadrant.</li><li><strong>Track portfolio balance</strong> — color-coded outcomes show whether you're over-investing in one strategic theme.</li><li><strong>Reduce recency bias</strong> — seeing all initiatives at once prevents the loudest request from dominating.</li></ul><h3>Use cases</h3><ul><li>Quarterly planning and roadmap reviews</li><li>Sprint backlog prioritization with engineering leads</li><li>Executive strategy sessions and board prep</li><li>Build-vs-buy and investment trade-off analysis</li><li>Cross-team alignment on shared resources</li></ul>` },
+    { label: 'Getting Started', content: `<h2>Getting Started</h2><h3>1. Load your data</h3><p>Click <strong>Load</strong> to open a JSON file. In Chrome, the app remembers the file so Save writes back to it directly.</p><h3>2. Add initiatives</h3><p>Click <strong>Add</strong> in the toolbar. Fill in the name, adjust the sliders, pick an outcome category and timeline.</p><h3>3. Position on the chart</h3><p>Use the sliders — or drag bubbles directly on the chart to reposition them. Values snap to whole numbers.</p><h3>4. Save and share</h3><p>Click <strong>Save</strong> to write back to the file (Chrome) or download a fresh copy (Safari/Firefox).</p><h3>5. Configure to your context</h3><p>Open the gear icon to rename axes, change outcome colors, relabel quadrants, or adjust the page title.</p>` },
+    { label: 'Features', content: `<h2>Features</h2><h3>Chart</h3><ul><li><strong>Drag to move</strong> — click and drag any bubble to reposition it</li><li><strong>Hover glow</strong> — bubbles glow on hover with a tooltip</li><li><strong>Legend toggles</strong> — click legend items to show/hide outcome categories</li><li><strong>Fullscreen</strong> — expand the chart for presentations</li></ul><h3>Data grid</h3><ul><li><strong>Sliders</strong> — adjust Cost, Benefits, and Importance (1–10)</li><li><strong>Sortable columns</strong> — click any column header</li><li><strong>Highlight</strong> — click a row to highlight its bubble</li><li><strong>Notes</strong> — click the chevron to expand a notes field</li><li><strong>Duplicate</strong> — the ⧉ button copies a row</li></ul><h3>Data management</h3><ul><li><strong>Save in place</strong> — Chrome saves directly to the loaded file</li><li><strong>Export CSV</strong> — download the table as a spreadsheet</li><li><strong>Undo / Redo</strong> — up to 50 steps of history (includes config changes)</li></ul>` },
+    { label: 'Tips', content: `<h2>Tips &amp; Tricks</h2><ul><li>Use <kbd>Esc</kbd> to close any modal</li><li>Drag bubbles during meetings to collaboratively reprioritize</li><li>Sort by Importance descending to quickly find top items</li><li>Use the notes field to capture discussion context</li><li>Change axis labels to match your framework</li><li>Store the HTML + JSON in Google Drive for team access</li><li>Use the CSV export for spreadsheets or slide deck tables</li><li>Fullscreen mode is ideal for screen-sharing</li><li>The JSON file is human-readable and can be edited in any text editor</li></ul>` },
+    { label: 'Technical', content: `<h2>Technical Details</h2><h3>Architecture</h3><ul><li><strong>Single HTML file</strong> — all CSS, JS, and SVG are inlined. No build step.</li><li><strong>Client-side only</strong> — no server, no database, no network requests (except Chart.js CDN).</li><li><strong>Chart.js 4.x</strong> — renders the bubble chart via Canvas 2D with custom plugins.</li></ul><h3>Security</h3><ul><li>CDN script loaded with Subresource Integrity (SRI) hash</li><li>No innerHTML used with user-supplied data — DOM construction only</li><li>Input validation on all loaded JSON data</li><li>Color values sanitized to prevent injection</li></ul><h3>Browser compatibility</h3><ul><li>Chrome, Edge, Arc, Brave — full support including save-in-place</li><li>Safari, Firefox — full functionality except save-in-place (downloads instead)</li></ul>` }
+  ];
+
+  let activeTab = 0;
+
+  function renderTabs() {
+    const tabsContainer = document.querySelector('.help-tabs');
+    DOM.clear(tabsContainer);
+    tabs.forEach((tab, i) => {
+      const btn = DOM.el('button', {
+        className: 'help-tab' + (i === activeTab ? ' active' : ''),
+        role: 'tab',
+        'aria-selected': String(i === activeTab),
+        'aria-controls': 'helpContent',
+        onClick() {
+          activeTab = i;
+          renderTabs();
+          renderContent();
+        }
+      }, tab.label);
+      tabsContainer.appendChild(btn);
+    });
+  }
+
+  function renderContent() {
+    // Help content is static authored HTML (not user data), safe to use innerHTML
+    document.getElementById('helpContent').innerHTML = tabs[activeTab].content;
+  }
+
+  return {
+    toggle() {
+      const panel = document.getElementById('helpPanel');
+      const backdrop = document.getElementById('helpBackdrop');
+      const isOpen = panel.classList.toggle('active');
+      backdrop.classList.toggle('active', isOpen);
+      if (isOpen) {
+        renderTabs();
+        renderContent();
+      }
+    },
+
+    init() {
+      document.getElementById('helpBackdrop').addEventListener('click', () => this.toggle());
+    }
+  };
+})();
+
+// ============================================================
+// Initialization
+// ============================================================
+(function init() {
+  ToolbarModule.init();
+  FileModule.init();
+  ConfigModule.init();
+  HelpModule.init();
+  FileModule.applySettings();
+  GridModule.render();
+  ChartModule.build();
+  ToolbarModule.updateUndoButtons();
+})();
+</script>
+</body>
+</html>
