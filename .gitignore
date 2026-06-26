@@ -1,0 +1,17 @@
+# Generated output
+prioritymap-data.json
+
+# Config with credentials
+spira.cfg
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+
+# OS files
+.DS_Store
+Thumbs.db
