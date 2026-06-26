@@ -24,3 +24,63 @@ Prioritization discussions often stall because stakeholders weigh different fact
 - Open it in your browser (no server required)
 - Read the in-app help
 - Save your work at any time to a local JSON (and load it next time)
+
+## SpiraPlan Import Utility
+
+`spira-to-prioritymap.py` extracts Requirements and/or Capabilities from Inflectra SpiraPlan and generates a JSON file that PriorityMap can load directly.
+
+### Prerequisites
+- Python 3.7+
+- A SpiraPlan user account with an RSS Token (API key)
+
+### Setup
+1. Copy `spira.cfg.example` to `spira.cfg`
+2. Fill in your SpiraPlan connection details:
+   ```ini
+   [connection]
+   base_url = https://mycompany.spiraservice.net
+   username = your_username
+   api_key = {YOUR-RSS-TOKEN-HERE}
+
+   [requirements]
+   types = Initiative, Epic
+   ```
+
+### Usage
+```bash
+# Export requirements from a project (types filtered by spira.cfg)
+python3 spira-to-prioritymap.py --project-id 1
+
+# Export capabilities from a program
+python3 spira-to-prioritymap.py --program-id 2
+
+# Both, with custom output file
+python3 spira-to-prioritymap.py --project-id 1 --program-id 2 -o board.json
+
+# Override config type filter from the command line
+python3 spira-to-prioritymap.py --project-id 1 --requirement-type Feature
+```
+
+### Options
+| Flag | Description |
+|------|-------------|
+| `--config PATH` | Path to config file (default: `spira.cfg`) |
+| `--project-id N` | Project ID — fetches requirements |
+| `--program-id N` | Program ID — fetches capabilities |
+| `--requirement-type TYPE` | Filter by type name (repeatable; overrides config) |
+| `--include-summary` | Include summary/parent requirements when no type filter is set |
+| `-o, --output FILE` | Output JSON file (default: `prioritymap-data.json`) |
+
+### Field mapping
+
+| PriorityMap field | Requirements source | Capabilities source |
+|-------------------|--------------------|--------------------|
+| title | Name | Name |
+| costComplexity | EstimatePoints (1-10, default 5) | 5 |
+| benefitsImpact | ImportanceId (scaled) | CapabilityPriorityId (scaled) |
+| importance | ImportanceId (scaled) | CapabilityPriorityId (scaled) |
+| outcome | "Requirement" | "Capability" |
+| notes | Description (HTML stripped) | Description (HTML stripped) |
+
+### Loading the output
+Open `priority-map.html` in your browser and click **Load** to import the generated `prioritymap-data.json` file.

@@ -1,0 +1,10 @@
+[connection]
+base_url = https://mycompany.spiraservice.net
+username = your_username
+api_key = {XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}
+
+[requirements]
+# Comma-separated list of requirement type names to include.
+# Omit or leave blank to include all types.
+# Example: types = Initiative, User Story, Feature
+types =
